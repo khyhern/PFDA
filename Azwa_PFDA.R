@@ -13,3 +13,16 @@ local_file <- "4.hackingdata.csv"
 csvdata <- read_csv(local_file)
 hackingdata = data.frame(csvdata)
 
+
+
+#Data Cleaning
+
+#Removing Duplicates in Data
+#Data Cleaning
+#Removing Duplicates
+nrow(hackingdata) #[212093]
+hackingdata[duplicated(hackingdata) | duplicated(hackingdata, fromLast = TRUE), ]
+hackingdata <- distinct(hackingdata)
+nrow(hackingdata) #[211913]
+
+
