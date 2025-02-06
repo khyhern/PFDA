@@ -228,3 +228,21 @@ summary(df_filtered$OS_Base)
 # Verify there are no unexpected missing values in OS or OS_Version
 sum(is.na(df_filtered$OS) | df_filtered$OS == "")
 sum(is.na(df_filtered$OS_Version))
+
+# Clean 'Encoding' column
+# Replace "NULL" and empty values with NA
+df_filtered$Encoding <- ifelse(df_filtered$Encoding %in% c("NULL", "", NA), NA, df_filtered$Encoding)
+
+# Standardize encoding names
+df_filtered$Encoding <- tolower(df_filtered$Encoding)  # Convert to lowercase
+df_filtered$Encoding <- gsub("utf-8", "UTF-8", df_filtered$Encoding)
+df_filtered$Encoding <- gsub("iso-8859-1", "ISO-8859-1", df_filtered$Encoding)
+df_filtered$Encoding <- gsub("windows-1252", "Windows-1252", df_filtered$Encoding)
+df_filtered$Encoding <- gsub("gb2312", "GB2312", df_filtered$Encoding)
+df_filtered$Encoding <- gsub("big5", "BIG5", df_filtered$Encoding)
+
+# Fill missing values with "Unknown"
+df_filtered$Encoding[is.na(df_filtered$Encoding)] <- "Unknown"
+
+# Check results
+table(df_filtered$Encoding)
