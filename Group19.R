@@ -162,3 +162,18 @@ print(missing_loss)
 #Converting to numeric by removing commas.
 df_filtered$Loss <- as.numeric(gsub(",", "", df_filtered$Loss))  
 
+# Clean 'IP' column
+# Step 1: Trim spaces
+df_filtered <- df_filtered %>%
+  mutate(IP = str_trim(IP))
+
+# Step 2: Replace missing values (NA, empty, whitespace) with "Unknown"
+df_filtered <- df_filtered %>%
+  mutate(IP = ifelse(IP == "" | is.na(IP) | str_detect(IP, "^\\s*$"), "Unknown", IP))
+
+# Step 3: Replace non-IP characters (anything not numbers, dots) with "Unknown"
+df_filtered <- df_filtered %>%
+  mutate(IP = ifelse(str_detect(IP, "[^0-9.]"), "Unknown", IP))
+
+
+
