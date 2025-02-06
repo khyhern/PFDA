@@ -136,3 +136,29 @@ df_filtered <- df_filtered %>%
 # Display cleaned country column
 unique(df_filtered$country_name)
 
+#Cleaning 'Ransom' column 
+
+#Checking for missing values in ransom. 
+missing_ransom <- sum(is.na(df_filtered$Ransom) | df_filtered$Ransom == "")
+print(missing_ransom)
+#Converting to numeric by removing commas.
+df_filtered$Ransom <- as.numeric(gsub(",", "", df_filtered$Ransom))  
+
+
+#Cleaning 'Downtime' column 
+
+#Checking for missing values in downtime. 
+missing_downtime <- sum(is.na(df_filtered$DownTime) | df_filtered$DownTime == "")
+print(missing_downtime)
+#Converting to numeric by removing commas.
+df_filtered$DownTime <- as.numeric(gsub(",", "", df_filtered$DownTime))  
+
+
+#Cleaning 'Loss' column
+
+#Checking for missing values in loss. 
+missing_loss <- sum(is.na(df_filtered$Loss) | df_filtered$Loss == "")
+print(missing_loss)
+#Converting to numeric by removing commas.
+df_filtered$Loss <- as.numeric(gsub(",", "", df_filtered$Loss))  
+
