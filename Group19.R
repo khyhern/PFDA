@@ -3,6 +3,10 @@ library(dplyr)
 library(stringr)
 library(lubridate)
 library(ggplot2)
+library(countrycode)  # For country name standardization
+library(tidyverse)  # Data wrangling
+library(janitor)  # Cleaning column names
+
 
 # Read the CSV file "4.hackingdata.csv" from the current working directory
 df <- read.csv("4.hackingdata.csv")
@@ -13,6 +17,7 @@ missing_values <- colSums(is.na(df) | df == "")
 # Convert to data frame for better readability
 missing_values_df <- data.frame(Column = names(missing_values), Missing_Values = missing_values)
 
+# Clean the 'Date' column 
 # Step 1: Convert the 'Date' column to Date format (Automatically detects format)
 df$Date <- parse_date_time(df$Date, orders = c("ymd", "dmy", "mdy", "d-b-Y"))
 
@@ -77,4 +82,57 @@ df_filtered <- df_filtered %>%
 unique(df_filtered$WebServer_Base)  # Check standardized names
 unique(df_filtered$WebServer_Version)  # Check extracted versions
 summary(df_filtered$WebServer_Base)
+
+# Clean 'Country' column 
+# https://rpubs.com/Teal_Emery/cleaning_intl_data_tips_and_tricks
+# Helper function: Convert country name to ISO3C code
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
+
+# Helper function: Convert ISO3C back to standardized country name
+iso3c_to_country_name <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "iso3c", destination = "country.name")
+}
+
+# Step 1: Standardize country names BEFORE applying countrycode
+df_filtered <- df_filtered %>%
+  mutate(Country = str_trim(Country)) %>%
+  mutate(Country = case_when(
+    # Handle completely unknown/missing values
+    Country %in% c("", "Unknown", "UNKNOWN") ~ "Unknown",
+    
+    # Handle geographic regions and ambiguous names
+    Country %in% c("Africa", "America", "Asia", "EUROPE", "SouthAmerica", "WestEuro", 
+                   "EastEuro", "MiddleEast", "Oseania", "ASIA/PACIFIC REGION", 
+                   "European Union", "European Uni") ~ "Unknown",
+    
+    # Handle invalid proxy/provider values
+    Country %in% c("Anonymous Proxy", "ANONYMOUS PROXY", "Satellite Provider", "SATELLITE PROVIDER") ~ "Unknown",
+    
+    # Fix incorrect or non-standard country names
+    Country == "T¸rkiye" ~ "Turkey",
+    Country == "U.S.A" | Country == "Usa" ~ "United States",
+    Country == "United State" ~ "United States",
+    Country == "Uk" | Country == "United Kingd" ~ "United Kingdom",
+    Country == "Uae" ~ "United Arab Emirates",
+    Country == "MICRONESIA" ~ "Federated States of Micronesia",
+    Country == "CALEDONIA" | Country == "New Caledoni" ~ "New Caledonia",
+    Country %in% c("ASCENSIONISLAND", "Ascension Island") ~ "Saint Helena, Ascension and Tristan da Cunha",
+    Country == "French Polyn" ~ "French Polynesia",
+    Country == "Virgin Islan" | Country == "Virgin Islands" ~ "United States Virgin Islands",
+    Country == "YUGOSLAVIA" ~ "Serbia",  # Yugoslavia no longer exists
+    TRUE ~ Country
+  ))
+
+# Step 2: Apply ISO3C conversion and handle missing matches
+df_filtered <- df_filtered %>%
+  mutate(iso3c = country_regex_to_iso3c(Country)) %>%
+  mutate(country_name = iso3c_to_country_name(iso3c)) %>%
+  mutate(country_name = ifelse(is.na(country_name) | country_name == "", "Unknown", country_name))
+
+# Display cleaned country column
+unique(df_filtered$country_name)
 
