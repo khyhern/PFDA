@@ -1,58 +1,46 @@
 #Libraries Installed
-library("readr") #Reads CSV Files Into R
-library("dplyr")  #Data Manipulation
-library("tidyverse") #Not Sure
-library("naniar") #MCAR
-library("ggplot2") #Creating Plots
+library("readr") 
+library("dplyr")  
+library("tidyverse")
+library("naniar") 
+library("ggplot2") 
+library("lubridate")
+library("stringr")
 
-#Setting the CWD
-setwd("D:/PFDA") 
+# Read the CSV file "4.hackingdata.csv" from the current working directory
+df <- read.csv("4.hackingdata.csv")
 
-#Data Import
-local_file <- "4.hackingdata.csv"
-csvdata <- read_csv(local_file)
-hackingdata = data.frame(csvdata)
+# Function to check for both NA and empty string values
+missing_values <- colSums(is.na(df) | df == "")
 
-
-
-#Data Cleaning
-
-#Removing Duplicates in Data
-#Data Cleaning
-#Removing Duplicates
-nrow(hackingdata) #[212093]
-hackingdata[duplicated(hackingdata) | duplicated(hackingdata, fromLast = TRUE), ]
-hackingdata <- distinct(hackingdata)
-nrow(hackingdata) #[211913]
+# Convert to data frame for better readability
+missing_values_df <- data.frame(Column = names(missing_values), Missing_Values = missing_values)
 
 
-#Missing Values
-
-hackingdata %>%
-  summarise(across(everything(), ~ sum(is.na(.))))
-
-mcar_test(hackingdata) # p-value < 0.5 thus must impute
-
-#DownTime [0 Missing Values]
-
-#Ransom [159,820 Missing Values] 
-#Since DownTime is a factor of Loss - And DownTime is never missing then there will always be loss
-#But it does not mean the Ransom is always a factor as it could be 0
-hackingdata <- hackingdata %>%
-  mutate(Ransom = ifelse(is.na(Ransom), 0, Ransom))
-
-#Loss [33,594 Missing Values] 
-#Loss Mean = 2771.061
-hackingdata$Loss[is.na(hackingdata$Loss)] <- mean(hackingdata$Loss, na.rm = TRUE)
 
 
-#Outliers in Loss
-Loss_Q1 <- quantile(hackingdata$Loss, 0.25)
-Loss_Q3 <- quantile(hackingdata$Loss, 0.75)
-Loss_IQR <- Loss_Q3 - Loss_Q1
-Loss_LB <- Loss_Q1 - 1.5*Loss_IQR
-Loss_UB <- Loss_Q3 + 1.5*Loss_IQR
-Loss_Outliers <- hackingdata$Loss[hackingdata$Loss < Loss_LB | hackingdata$Loss > Loss_UB]
+#Cleaning Ransom column 
 
-hackingdata$Loss <- ifelse(hackingdata$Loss > Loss_UB, Loss_UB, hackingdata$Loss)
-hackingdata$Loss <- ifelse(hackingdata$Loss < Loss_LB, Loss_LB, hackingdata$Loss)
+#Checking for missing values in ransom. 
+missing_ransom <- sum(is.na(df$Ransom) | df$Ransom == "")
+print(missing_ransom)
+#Converting to numeric by removing commas.
+df$Ransom <- as.numeric(gsub(",", "", df$Ransom))  
+
+
+#Cleaning Downtime column 
+
+#Checking for missing values in downtime. 
+missing_downtime <- sum(is.na(df$DownTime) | df$DownTime == "")
+print(missing_downtime)
+#Converting to numeric by removing commas.
+df$DownTime <- as.numeric(gsub(",", "", df$DownTime))  
+
+
+#Cleaning Loss column
+
+#Checking for missing values in loss. 
+missing_loss <- sum(is.na(df$Loss) | df$Loss == "")
+print(missing_loss)
+#Converting to numeric by removing commas.
+df$Loss <- as.numeric(gsub(",", "", df$Loss))  
