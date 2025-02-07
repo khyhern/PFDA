@@ -6,6 +6,7 @@ library(ggplot2)
 library(countrycode)  # For country name standardization
 library(tidyverse)  # Data wrangling
 library(janitor)  # Cleaning column names
+library(readr)
 
 
 # Read the CSV file "4.hackingdata.csv" from the current working directory
@@ -77,6 +78,10 @@ df_filtered <- df_filtered %>%
     # Step 5: Extract the Web Server Version
     WebServer_Version = str_extract(WebServer, "[0-9]+(\\.[0-9]+)*")
   )
+
+# Combine WebServer_Base and WebServer_Version to create a full version label
+df_filtered <- df_filtered %>%
+  mutate(WebServer_Full = paste(WebServer_Base, WebServer_Version))
 
 # Step 6: Verify Cleaned Data
 unique(df_filtered$WebServer_Base)  # Check standardized names
@@ -161,6 +166,11 @@ missing_loss <- sum(is.na(df_filtered$Loss) | df_filtered$Loss == "")
 print(missing_loss)
 #Converting to numeric by removing commas.
 df_filtered$Loss <- as.numeric(gsub(",", "", df_filtered$Loss))  
+
+# Impute Missing Values by Median Imputation per Web Server
+df_filtered <- df_filtered %>%
+  group_by(WebServer_Base) %>%
+  mutate(Loss = ifelse(is.na(Loss), median(Loss, na.rm = TRUE), Loss))
 
 # Clean 'IP' column
 # Step 1: Trim spaces
@@ -247,7 +257,78 @@ df_filtered$Encoding[is.na(df_filtered$Encoding)] <- "Unknown"
 # Check results
 table(df_filtered$Encoding)
 
-# Ryan Yew Khy Hern, TP077536
-# Objective 1: To investigate the relationship between web server versions and financial loss 
+# Save cleaned dataset
+write.csv(df_filtered, "cleaned_hackingdata.csv", row.names = FALSE)
 
+
+# Ryan Yew Khy Hern, TP077536
+# Objective 1: To investigate the relationship between web server and financial loss 
+# Analysis 1-1: Web Server Versions Associated with the Highest Revenue Loss
+
+unique(df_filtered$WebServer_Base)  # Check standardized names
+unique(df_filtered$WebServer_Version)  # Check extracted versions
+
+# 1. Aggregate total revenue loss per WebServer_Base and WebServer_Version
+webserver_grouped <- df_filtered %>%
+  group_by(WebServer_Full) %>%
+  summarise(
+    Total_Loss = sum(Loss, na.rm = TRUE),
+    Incident_Count = n(),
+    Avg_Loss = mean(Loss, na.rm = TRUE),
+    Median_Loss = median(Loss, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(Total_Loss))
+
+# 2. Display the top 10 web server versions by Total Loss
+top_webservers <- head(webserver_grouped, 10)
+print(top_webservers)
+
+# 3. Visualize the top 10 Web Server Versions by Total Revenue Loss
+ggplot(top_webservers, aes(x = reorder(WebServer_Full, -Total_Loss), y = Total_Loss)) +
+  geom_bar(stat = "identity", fill = "red") +
+  coord_flip() +  # Flip for better label visibility
+  labs(title = "Top 10 Web Server Versions by Total Revenue Loss",
+       x = "Web Server Version",
+       y = "Total Loss (USD)") +
+  theme_minimal()
+
+# Analysis 1-2: Correlation Between Web Server Version and Average Loss
+
+# 1. Aggregate data to calculate average loss per incident for each web server version
+webserver_avg_loss <- df_filtered %>%
+  group_by(WebServer_Full) %>%
+  summarise(
+    Total_Loss = sum(Loss, na.rm = TRUE),
+    Incident_Count = n(),
+    Avg_Loss_Per_Incident = mean(Loss, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# 2. Calculate correlation between Avg_Loss_Per_Incident and other metrics (e.g., Incident_Count, Total_Loss)
+correlation_data <- webserver_avg_loss %>%
+  select(Avg_Loss_Per_Incident, Incident_Count, Total_Loss)
+
+# Calculate correlation matrix
+correlation_matrix <- cor(correlation_data, use = "complete.obs")
+print("Correlation Matrix:")
+print(correlation_matrix)
+
+# 3. Scatter plot: Avg Loss per Incident vs Incident Count
+ggplot(webserver_avg_loss, aes(x = Incident_Count, y = Avg_Loss_Per_Incident)) +
+  geom_point(color = "blue", alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Scatter Plot: Avg Loss per Incident vs. Incident Count",
+       x = "Number of Incidents",
+       y = "Average Loss per Incident (USD)") +
+  theme_minimal()
+
+# 4. Scatter plot: Total Loss vs Avg Loss per Incident (Optional for additional correlation)
+ggplot(webserver_avg_loss, aes(x = Total_Loss, y = Avg_Loss_Per_Incident)) +
+  geom_point(color = "green", alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Scatter Plot: Total Loss vs Avg Loss per Incident",
+       x = "Total Loss (USD)",
+       y = "Average Loss per Incident (USD)") +
+  theme_minimal()
 
