@@ -320,21 +320,19 @@ write.csv(df_filtered, "cleaned_hackingdata.csv", row.names = FALSE)
 # Analysis 1-1: Web Server Versions Associated with the Highest Revenue Loss
 # Identify which web server versions are linked to the most significant revenue losses due to defacement.
 
-unique(df_filtered$WebServer_Base)  # Check standardized names
-unique(df_filtered$WebServer_Version)  # Check extracted versions
-
 # Check unique standardized web server names and versions
 unique(df_filtered$WebServer_Base)  
 unique(df_filtered$WebServer_Version)
 
 # Step 1: Recalculate Aggregation Without "Unknown"
+total_loss_all <- sum(df_filtered$Loss, na.rm = TRUE)  # Compute total loss across all web servers
+
 webserver_grouped <- df_filtered %>%
   filter(str_to_lower(WebServer) != "unknown") %>%
   group_by(WebServer) %>%
   summarise(
     Total_Loss = sum(Loss, na.rm = TRUE),
-    Incident_Count = n(),
-    Avg_Loss = mean(Loss, na.rm = TRUE),
+    Percentage_Loss = (Total_Loss / total_loss_all) * 100,  # Calculate % contribution
     Median_Loss = median(Loss, na.rm = TRUE),
     .groups = "drop"
   ) %>%
@@ -344,20 +342,20 @@ webserver_grouped <- df_filtered %>%
 top_webservers <- webserver_grouped %>% slice_max(Total_Loss, n = 10)
 print(top_webservers)
 
-# Step 3: Visualize the Data
+# Step 3: Visualize the Data (Including Percentage Loss)
 ggplot(top_webservers, aes(x = reorder(WebServer, Total_Loss), y = Total_Loss)) +
   geom_col(fill = "red", width = 0.7) +  # Improve bar spacing
   coord_flip() +  # Flip for better readability
   labs(title = "Top 10 Web Server Versions by Total Revenue Loss",
        x = "Web Server Version",
        y = "Total Loss (USD)") +
-  scale_y_continuous(labels = scales::comma, limits = c(0, 350000000)) +  # Format Y-axis and set limit
-  geom_text(aes(label = scales::comma(Total_Loss)), 
-            hjust = -0.1, size = 4, color = "black", fontface = "bold") +  # Position labels to the right
+  scale_y_continuous(labels = scales::comma, limits = c(0, max(top_webservers$Total_Loss) * 1.1)) +  # Adjust limit dynamically
+  geom_text(aes(label = paste0(scales::comma(Total_Loss), " (", round(Percentage_Loss, 2), "%)")), 
+            hjust = -0.1, size = 4, color = "black", fontface = "bold") +  # Display both total loss & percentage
   theme_minimal(base_size = 12) +  # Adjust font size
   theme(plot.title = element_text(hjust = 0.5))  # Center title
 
-# Analysis 1-2: Correlation Between Web Server Version and Average Loss
+# Analysis 1-2: Assessing the Correlation Between Web Server Versions and Average Financial Loss Per Incident
 # Calculate the average revenue loss per incident for each web server version and analyze correlation trends.
 
 # 1. Aggregate data: Calculate average loss per incident for each web server version
@@ -407,39 +405,39 @@ ggplot(webserver_avg_loss, aes(x = Total_Loss, y = Avg_Loss_Per_Incident)) +
 # Analysis 1-3: Web Server Version vs. Downtime Impact on Financial Loss
 # Investigate whether specific web server versions contribute to longer downtimes and how that affects financial loss.
 
-  # 1. Aggregate downtime impact per Web Server Version
-  webserver_downtime <- df_filtered %>%
-    group_by(WebServer_Full) %>%
-    summarise(
-      Total_Loss = sum(Loss, na.rm = TRUE),
-      Total_Downtime = sum(DownTime, na.rm = TRUE),
-      Avg_Downtime = mean(DownTime, na.rm = TRUE),
-      Incident_Count = n(),
-      Avg_Loss_Per_Incident = mean(Loss, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    filter(Incident_Count >= 5)  # Remove web servers with very few incidents to avoid bias
-  
-  # 2. Compute correlation matrix (ensuring proper NA handling)
-  correlation_data <- webserver_downtime %>%
-    select(Avg_Downtime, Total_Downtime, Total_Loss, Avg_Loss_Per_Incident, Incident_Count) %>%
-    na.omit()  # Remove missing values before correlation analysis
-  
-  correlation_matrix <- cor(correlation_data, use = "pairwise.complete.obs", method = "pearson")
-  print("Correlation Matrix between DownTime and Financial Loss:")
-  print(correlation_matrix)
-  
-  # 3. Scatter plot: Total DownTime vs. Financial Loss
-  ggplot(webserver_downtime, aes(x = Total_Downtime, y = Total_Loss)) +
-    geom_point(color = "blue", alpha = 0.6, size = 3) +  # Adjust transparency & size
-    geom_smooth(method = "lm", se = FALSE, color = "red") +
-    scale_x_log10(labels = scales::comma) +  # Log scale for better visualization
-    scale_y_log10(labels = scales::comma) +
-    labs(title = "Total DownTime vs. Total Financial Loss",
-         subtitle = paste("Correlation:", round(correlation_matrix["Total_Downtime", "Total_Loss"], 3)),
-         x = "Total DownTime (Log Scale, Days)",
-         y = "Total Loss (Log Scale, USD)") +
-    theme_minimal()
+# 1. Aggregate downtime impact per Web Server Version
+webserver_downtime <- df_filtered %>%
+  group_by(WebServer_Full) %>%
+  summarise(
+    Total_Loss = sum(Loss, na.rm = TRUE),
+    Total_Downtime = sum(DownTime, na.rm = TRUE),
+    Avg_Downtime = mean(DownTime, na.rm = TRUE),
+    Incident_Count = n(),
+    Avg_Loss_Per_Incident = mean(Loss, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  filter(Incident_Count >= 5)  # Remove web servers with very few incidents to avoid bias
+
+# 2. Compute correlation matrix (ensuring proper NA handling)
+correlation_data <- webserver_downtime %>%
+  select(Avg_Downtime, Total_Downtime, Total_Loss, Avg_Loss_Per_Incident, Incident_Count) %>%
+  na.omit()  # Remove missing values before correlation analysis
+
+correlation_matrix <- cor(correlation_data, use = "pairwise.complete.obs", method = "pearson")
+print("Correlation Matrix between DownTime and Financial Loss:")
+print(correlation_matrix)
+
+# 3. Scatter plot: Total DownTime vs. Financial Loss
+ggplot(webserver_downtime, aes(x = Total_Downtime, y = Total_Loss)) +
+  geom_point(color = "blue", alpha = 0.6, size = 3) +  # Adjust transparency & size
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  scale_x_log10(labels = scales::comma) +  # Log scale for better visualization
+  scale_y_log10(labels = scales::comma) +
+  labs(title = "Total DownTime vs. Total Financial Loss",
+       subtitle = paste("Correlation:", round(correlation_matrix["Total_Downtime", "Total_Loss"], 3)),
+       x = "Total DownTime (Log Scale, Days)",
+       y = "Total Loss (Log Scale, USD)") +
+  theme_minimal()
 
 # 4. Scatter plot: Average Downtime vs. Average Loss per Incident
 ggplot(webserver_downtime, aes(x = Avg_Downtime, y = Avg_Loss_Per_Incident)) +
@@ -474,6 +472,44 @@ ggplot(top_downtime_webservers, aes(x = reorder(WebServer_Full, Total_Downtime),
        y = "Total Downtime (Days)") +
   theme_minimal()
 
+# Extra Feature 1-3: Categorizing Web Servers by Downtime Severity
+# -----------------------------------------------------------
+# This extra feature enhances the analysis by grouping web servers into three downtime severity categories:
+# - Low Downtime: < 100,000 total downtime
+# - Moderate Downtime: 100,000 - 499,999 total downtime
+# - High Downtime: ≥ 500,000 total downtime
+# By categorizing the data, we can compare the financial impact of different downtime levels more effectively.
+
+webserver_downtime <- webserver_downtime %>%
+  mutate(Downtime_Category = factor(case_when(
+    Total_Downtime < 100000 ~ "Low Downtime",
+    Total_Downtime >= 100000 & Total_Downtime < 500000 ~ "Moderate Downtime",
+    Total_Downtime >= 500000 ~ "High Downtime"
+  ), levels = c("Low Downtime", "Moderate Downtime", "High Downtime")))  # Set order for better visualization
+
+# Define Custom Colors for Clarity
+# -------------------------------
+# Custom color mapping improves readability by making each downtime category visually distinct.
+downtime_colors <- c("Low Downtime" = "#2ca25f", "Moderate Downtime" = "#2b8cbe", "High Downtime" = "#de2d26")
+
+# Visualization: Downtime Severity vs. Total Loss
+# -----------------------------------------------
+# This box plot compares total financial loss across different downtime severity categories.
+# It helps identify whether higher downtime results in significantly greater financial losses.
+ggplot(webserver_downtime, aes(x = Downtime_Category, y = Total_Loss, fill = Downtime_Category)) +
+  geom_boxplot(alpha = 0.7, outlier.color = "black", outlier.shape = 16, outlier.size = 1.5) +
+  scale_fill_manual(values = downtime_colors) +  # Apply custom colors
+  scale_y_log10(labels = scales::comma) +  # Log scale to handle large variations in financial loss
+  labs(title = "Financial Loss Across Downtime Severity Categories",
+       x = "Downtime Severity",
+       y = "Total Financial Loss (Log Scale, USD)") +
+  theme_minimal() +
+  theme(legend.position = "none",  # Remove legend for cleaner visualization
+        axis.text.x = element_text(size = 12, face = "bold"),  # Improve x-axis readability
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5))  # Center title for aesthetics
+
+
 
 # Analysis 1-4: Web Server Vulnerability Trend Over Time
 # Analyze the historical trend of web server vulnerabilities by tracking which versions have been defaced most frequently over time.
@@ -500,28 +536,24 @@ webserver_trend_top <- webserver_trend %>%
   filter(WebServer_Full %in% top_vulnerable_webservers) %>%
   arrange(Date)
 
-# 4. Fill missing values with 0 before applying smoothing
-webserver_trend_top <- webserver_trend_top %>%
-  complete(Date, WebServer_Full, fill = list(Incident_Count = 0))  # Fill missing months
-
-# 5. Apply a Rolling Mean (Moving Average) to Smooth Trends (12-Month Window)
+# 4. Apply a Rolling Mean (Moving Average) to Smooth Trends (12-Month Window)
 webserver_trend_top <- webserver_trend_top %>%
   group_by(WebServer_Full) %>%
   mutate(Smoothed_Incidents = zoo::rollmean(Incident_Count, k = 12, fill = NA, align = "right"))
 
-# 6. Remove NA values from the smoothed dataset before plotting
+# 5. Remove NA values from the smoothed dataset before plotting
 webserver_trend_top <- webserver_trend_top %>%
   filter(!is.na(Smoothed_Incidents))
 
-# 7. Define a Color Palette for Stronger Contrast
+# 6. Define a Color Palette for Stronger Contrast
 custom_colors <- c("apache" = "red", "microsoft-iis" = "gold", 
                    "microsoft-iis 6.0" = "green", "nginx" = "blue", 
                    "unknown" = "purple")
 
-# 8. Adjust Y-Axis Scaling to Avoid Large Empty Spaces
+# 7. Adjust Y-Axis Scaling to Avoid Large Empty Spaces
 y_max <- max(webserver_trend_top$Smoothed_Incidents, na.rm = TRUE) * 1.1
 
-# 9. Plot the Smoothed Time Series with Enhanced Formatting
+# 8. Plot the Smoothed Time Series with Enhanced Formatting
 ggplot(webserver_trend_top, aes(x = Date, y = Smoothed_Incidents, color = WebServer_Full)) +
   geom_line(size = 1.2) +  # Slightly thicker lines
   geom_point(alpha = 0.5, size = 2) +  # Points for context
@@ -575,8 +607,6 @@ ggplot(top_webserver_loss, aes(x = reorder(WebServer_Base, Total_Loss), y = Tota
 # 3. Box Plot - Financial Loss Distribution Across Web Server Types (Log Scale)
 ggplot(df_filtered, aes(x = WebServer_Base, y = Loss)) +
   geom_boxplot(fill = "blue", alpha = 0.7, outlier.color = "red", outlier.shape = 16, outlier.size = 1.5) +
-  stat_summary(fun = median, geom = "text", aes(label = round(..y.., 2)), 
-               size = 3, vjust = -0.5, color = "black") +  # Improve median label placement
   coord_flip() +  # Flip for better readability
   scale_y_log10(labels = scales::comma, limits = c(10, max(df_filtered$Loss, na.rm = TRUE) * 1.5)) +  # Adjust log scale range
   labs(title = "Financial Loss Distribution Across Web Server Types",
