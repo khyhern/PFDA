@@ -1003,3 +1003,108 @@ ggplot(df_filtered_clean, aes(x = Ransom, y = Encoding_Grouped)) +
   ) +
   scale_y_discrete(limits = rev(top_encodings), drop = TRUE) +  # Reverse y-axis order
   coord_cartesian(expand = FALSE)  # Remove padding around the plot
+
+
+# Azwa Al Islam, TP078098
+# Objective 4 :  To investigate if financial loss is influenced by the amount of ransom paid and downtime experienced.
+# Analysis 4-1: Does an increased downtime cause a larger financial loss?
+
+# Categorizing the Data
+df_filtered <- df_filtered %>%
+  mutate(downtime_category = cut(
+    DownTime,
+    breaks = c(-Inf, 10, 20, 30, 40, 50, Inf),
+    labels = c("A", "B", "C", "D", "E", "F")
+  )) %>%
+  group_by(downtime_category) %>%
+  mutate(total_loss = sum(Loss, na.rm = TRUE)) %>%
+  ungroup()
+# Visualizing the Data With a Bar Chart
+downtime_labels <- c(
+  "A" = "0–10 days",
+  "B" = "11–20 days",
+  "C" = "21–30 days",
+  "D" = "31–40 days",
+  "E" = "41–50 days",
+  "F" = "51–60 days"
+)
+
+ggplot(df_filtered, aes(x = downtime_category, y = total_loss, fill = downtime_category)) +
+  geom_bar(stat = "identity") +
+  scale_x_discrete(labels = downtime_labels) +  # Update x-axis labels
+  scale_fill_manual(values = c("#FFC0CB", "#FFB6C1", "#FF69B4", "#FF1493", "#C71585", "#8B008B"), 
+                    labels = downtime_labels, name = "DownTime Category") +  # Update legend
+  labs(
+    title = "Total Loss by DownTime Category",
+    x = "DownTime Category",
+    y = "Total Loss"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for readability
+
+#Analysis 4-2: How does the distribution of financial loss vary across different ransom amounts categorized as low, medium, and high? 
+
+#Grouping into Low, Medium, and High
+#Low = (-infinite - 1000), medium = (1000-2000), high = (2000 - infinite)
+# Categorize Ransom Values Into Low, Medium, and High
+df_filtered$ransom_category <- cut(df_filtered$Ransom, 
+                                   breaks = c(-Inf, 1456, 2300, Inf),
+                                   labels = c("Low", "Medium", "High"),
+                                   right = FALSE)
+#Visualizing With a Density Plot for Financial Loss Distribution By Ransom Category
+ggplot(df_filtered, aes(x = Loss, fill = ransom_category)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Distribution of Financial Loss for Different Ransom Categories",
+       x = "Financial Loss",
+       y = "Density") +
+  scale_fill_manual(values = c("Low" = "#FFB6C1", "Medium" = "#ADD8E6", "High" = "#FBEC94")) +  
+  theme_minimal()
+
+#Analysis 4-3 : Which factor—ransom paid or downtime—has a greater impact on financial loss?
+# Calculating correlation between Loss and Ransom
+cor_ransom_loss <- cor(df_filtered$Ransom, df_filtered$Loss, use = "complete.obs", method = "pearson")
+
+# Calculating correlation between Loss and DownTime
+cor_downtime_loss <- cor(df_filtered$DownTime, df_filtered$Loss, use = "complete.obs", method = "pearson")
+
+# Printing the results
+print(paste("Correlation between Ransom and Loss:", cor_ransom_loss))
+print(paste("Correlation between DownTime and Loss:", cor_downtime_loss))
+
+#Visualization With Scatter Plots
+# Scatter plot for Ransom vs Loss
+ggplot(df_filtered, aes(x = Ransom, y = Loss)) +
+  geom_point(color = "lightblue") +
+  geom_smooth(method = "lm", color = "darkblue", se = FALSE) +
+  labs(title = "Relationship between Ransom and Loss",
+       x = "Ransom Paid",
+       y = "Financial Loss") +
+  theme_minimal()
+# Scatter plot for DownTime vs Loss
+ggplot(df_filtered, aes(x = DownTime, y = Loss)) +
+  geom_point(color = "lightpink") +
+  geom_smooth(method = "lm", color = "darkred", se = FALSE) +
+  labs(title = "Relationship between DownTime and Loss",
+       x = "Downtime (Days)",
+       y = "Financial Loss") +
+  theme_minimal()
+#Assessing variance in Loss is explained by Ransom and DownTime.
+# Linear regression for Ransom effect on Loss
+lm_ransom <- lm(Loss ~ Ransom, data = df_filtered)
+summary(lm_ransom)
+
+# Linear regression for DownTime effect on Loss
+lm_downtime <- lm(Loss ~ DownTime, data = df_filtered)
+summary(lm_downtime)
+
+#Analysis 4-4: Can financial loss be accurately predicted by combining the ransom amount and downtime?
+#Heatmap to comprehend the impact of the combination of ‘Ransom’ and ‘DownTime’ on ‘Loss’.
+ggplot(df_filtered, aes(x = Ransom, y = DownTime)) +
+  stat_summary_2d(aes(z = Loss), bins = 40) +
+  scale_fill_viridis_c(option = "mako", direction = -1) +
+  labs(title = "Heatmap of Ransom Amount, Downtime, and Financial Loss",
+       x = "Ransom Amount ('000)",
+       y = "Downtime (Days)",
+       fill = "Avg Loss") +
+  theme_minimal()
+
