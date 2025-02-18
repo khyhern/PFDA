@@ -817,19 +817,6 @@ print(
 
 
 ##### Analysis 3-2: Do specific encoding methods result in higher financial losses? #####
-# Ensure Loss and Encoding columns are clean and numeric
-df_filtered <- df_filtered %>%
-  mutate(
-    Loss = as.numeric(Loss)  # Ensure Loss is numeric
-  )
-
-# Check for missing values in Encoding and Loss columns
-missing_encoding <- sum(is.na(df_filtered$Encoding) | df_filtered$Encoding == "")
-missing_loss <- sum(is.na(df_filtered$Loss))
-
-# Print the results
-print(paste("Missing Encoding values:", missing_encoding))
-print(paste("Missing Loss values:", missing_loss))
 
 # Bar plot for all encoding methods
 ggplot(df_filtered, aes(x = Encoding, y = Loss)) +
